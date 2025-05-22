@@ -22,4 +22,4 @@ RUN chmod +x /app/start.sh
 EXPOSE 8000
 
 # Command to run the application
-CMD ["/app/start.sh"]
+CMD ["python", "codeassist/api/main.py"]
