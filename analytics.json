@@ -1,0 +1,13 @@
+{
+  "total_requests": 0,
+  "completion_requests": 0,
+  "review_requests": 0,
+  "explanation_requests": 0,
+  "successful_requests": 0,
+  "failed_requests": 0,
+  "average_response_time": 0.0,
+  "first_request": null,
+  "last_request": null,
+  "requests_by_day": {},
+  "response_times": []
+}

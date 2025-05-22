@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
 import sys
 import os
+import time
 from pathlib import Path
 
 # Add parent directories to path for imports
@@ -8,8 +9,10 @@ sys.path.append(str(Path(__file__).parent.parent.parent))
 
 from api.models import CodeRequest, ReviewResponse, FileRequest
 from models.llm_client import LLMClient
+from services.analytics import AnalyticsService
 
 router = APIRouter()
+analytics = AnalyticsService()
 
 @router.post("/review", response_model=ReviewResponse)
 async def review_code(request: CodeRequest):
@@ -20,10 +23,13 @@ async def review_code(request: CodeRequest):
     - **context**: Optional context about the code
     - **model**: OpenAI model to use (default: gpt-3.5-turbo)
     """
+    start_time = time.time()
+    
     try:
         # Check if API key is configured
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key or api_key == "your_openai_api_key_here":
+            analytics.track_request("review", False)
             raise HTTPException(
                 status_code=400,
                 detail="OpenAI API key not configured. Set OPENAI_API_KEY environment variable."
@@ -60,6 +66,10 @@ async def review_code(request: CodeRequest):
         
         review = await llm.generate(messages, temperature=0.3, max_tokens=800)
         
+        # Track successful request
+        response_time = time.time() - start_time
+        analytics.track_request("review", True, response_time)
+        
         return ReviewResponse(
             original_code=request.code,
             review=review,
@@ -68,8 +78,10 @@ async def review_code(request: CodeRequest):
         )
         
     except ValueError as e:
+        analytics.track_request("review", False)
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
+        analytics.track_request("review", False)
         raise HTTPException(status_code=500, detail=f"Review failed: {str(e)}")
 
 @router.post("/review/file", response_model=ReviewResponse)
@@ -94,6 +106,7 @@ async def review_file(request: FileRequest):
         return await review_code(code_request)
         
     except Exception as e:
+        analytics.track_request("review", False)
         raise HTTPException(status_code=500, detail=f"File review failed: {str(e)}")
 
 @router.get("/review/examples")
@@ -123,4 +136,15 @@ async def get_review_examples():
                 }
             }
         ]
+    }
+
+@router.get("/review/stats")
+async def get_review_analytics():
+    """Get review-specific analytics"""
+    stats = analytics.get_stats()
+    return {
+        "review_requests": stats.get("review_requests", 0),
+        "total_requests": stats.get("total_requests", 0),
+        "success_rate": stats.get("success_rate", 0),
+        "average_response_time": stats.get("average_response_time", 0)
     }
